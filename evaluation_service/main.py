@@ -1,37 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any
-import time
+
 from shared.hashing import compute_bucket
 from shared.rules import evaluate_flag
-from shared.models import FlagVersion, Variant, TargetingRule
+from evaluation_service.repositories.flag_repository import InMemoryFlagRepository
 
-FLAG_STORE : dict[str, FlagVersion]
-FLAG_STORE = {
-    "new_checkout": FlagVersion(
-        flag_key="new_checkout",
-        version=1,
-        enabled=True,
-        rules=[
-            TargetingRule(
-                attribute="country",
-                operator="equals",
-                value="US",
-                variants=[
-                    Variant(name="on", value=True, weight=50),
-                    Variant(name="off", value=False, weight=50),
-                ],
-            )
-        ],
-        default_variant=Variant(name="off", value=False, weight=100),
-        created_at= "2026-01-21T00:36:00Z",
-    )
-}
+flag_repository = InMemoryFlagRepository()
 
 app = FastAPI(title="Feature Flag Evaluation Service")
 
 class EvaluationRequest(BaseModel):
-    flag_version: str
+    flag_key: str
     user_id: str
     user_attributes: Dict[str, str]
     
@@ -43,7 +23,7 @@ class EvaluationResponse(BaseModel):
 
 @app.post("/evaluate", response_model=EvaluationResponse)
 def evaluate(req: EvaluationRequest):
-    flag = FLAG_STORE.get(req.flag_key)
+    flag = flag_repository.get(req.flag_key)
 
     if not flag:
         raise HTTPException(status_code=404, detail="Flag not found")
@@ -53,7 +33,7 @@ def evaluate(req: EvaluationRequest):
     try:
         variant = evaluate_flag(
             flag_version=flag,
-            user_attributes=req.attributes,
+            user_attributes=req.user_attributes,
             bucket=bucket,
         )
     except ValueError as e:
