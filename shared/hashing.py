@@ -1,6 +1,6 @@
 import hashlib
 
-def hash_bucket_for_user(feature_flag, user_id):
+def compute_bucket(feature_flag, user_id):
     """
     Computes a hash bucket for a given user and feature flag.
     Function is deterministic and will always return the same bucket for the same inputs.
